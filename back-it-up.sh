@@ -1,9 +1,7 @@
 #!/bin/bash
 
-#set -x
-
 VERSION='v.0.0.1a'
-TITLE="back-it-up ${VERSION} - Simple Backup manager"
+TITLE="back-it-up ${VERSION} - Simple backup manager"
 
 ESC=$'\x1B'
 BS="${ESC}[D"
@@ -87,6 +85,8 @@ Enviroment variables:
 		echo
 		fatal ${@}
 	fi
+
+	exit
 }
 
 function tldr()
@@ -140,15 +140,34 @@ back-it-up g my-texts
 
 ${YELLOW}- Get/Download all backups from a remote location, based on load backups (see --methods option for more details):${RESET}
 back-it-up g"
+
+	exit
 }
 
 function methods()
 {
 	echo "${TITLE}
 
-Methods... TODO"
+Methods
 
-	exit 0;
+If method is \"rsync\", it will handle natively, otherwise follow the instruction bellow.
+
+Look for a file in that sequence:
+	~/.config/back-it-up/methods/<METHOD>
+	~/.config/back-it-up/methods/<METHOD>.sh
+	~/.config/back-it-up/methods/<METHOD>.bin
+
+The call:
+	<METHOD_FILE> get|send <FILES>
+
+Return 1 means a failure.
+Return 0, success.
+
+Enviroment variables:
+	BACK_IT_UP_LOCAL  = With local path of the backup files.
+	BACK_IT_UP_REMOTE = Recomended variable with settings for the method."
+
+	exit
 }
 
 function fatal()
@@ -727,9 +746,10 @@ function upload_it()
 	ids_to_files_masked send "${@}"
 
 	if [ "$BACK_IT_UP_METHOD" == 'rsync' ]; then
-		back_it_up_method_rsync send ${FILES}  # WARN May be quoted
+		back_it_up_method_rsync send ${FILES}  # WARN May be quoted ???
+	elif [ -f "${METHOD_FILE}" ]; then
+		${METHOD_FILE} send ${FILES}           # WARN May be quoted ???
 	else
-echo "METHOD_FILE: ${METHOD_FILE}"
 		fatal "Unknown method: $BACK_IT_UP_METHOD"
 	fi
 }
@@ -741,9 +761,10 @@ function download_it()
 	ids_to_files_masked get ${@}
 
 	if [ "$BACK_IT_UP_METHOD" == 'rsync' ]; then
-		back_it_up_method_rsync get ${FILES}  # WARN May be quoted
+		back_it_up_method_rsync get ${FILES}   # WARN May be quoted ???
+	elif [ -f "${METHOD_FILE}" ]; then
+		${METHOD_FILE} get ${FILES}            # WARN May be quoted ???
 	else
-echo "METHOD_FILE: ${METHOD_FILE}"
 		fatal "Unknown method: $BACK_IT_UP_METHOD"
 	fi
 }
@@ -776,14 +797,6 @@ function ids_to_files_masked()
 
 function back_it_up_method_rsync()
 {
-	# Sintaxy:
-	#
-	# back_it_up_method_<name>()
-	#
-	# $1     = action (get, send)
-	# $FILES = files masked (/path/to/backups/{file1,file2}.tar
-	#
-
 	local remote
 	local port
 	local directory
@@ -817,7 +830,6 @@ function back_it_up_method_rsync()
 		;;
 	esac
 
-#echo "${sources[@]// /$'\n'}"
 	rsync -ahz --progress -e "ssh -p $port" ${sources} ${target}
 
 	return 0
@@ -864,6 +876,7 @@ function set_colors()
 
 function dependency()
 {
+	# TODO Make it better
 	! which "$1" &> /dev/null && fail=true && echo "Missing: $1"
 }
 
@@ -905,21 +918,21 @@ fi
 
 while [[ ${1} != '' ]]; do
 	case "${1}" in
-		-h|--help   ) usage  ; exit;;
-		   --tldr   ) tldr   ; exit;;
-		   --methods) methods; exit;;
+		-h|--help   ) usage  ;;
+		   --tldr   ) tldr   ;;
+		   --methods) methods;;
 
 		-c=*|--color=*) set_colors "${1#*=}";;
 		  -c|--color  ) [[ "${2:0:1}" != '-' ]] && shift && set_colors "$1" || set_colors auto;;
 
-		a|add         ) shift; add_it      "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
-		b|backup      ) shift; backup_it   "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
-		l|list        ) shift; list_it     "${@}";                                   exit;;
+		a|add         ) shift;      add_it "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
+		b|backup      ) shift;   backup_it "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
+		l|list        ) shift;     list_it "${@}";                                   exit;;
 		v|versions    ) shift; versions_it "${@}";                                   exit;;
-		d|delete      ) shift; delete_it   "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
-		  shrink      ) shift; shrink_it   "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
-		r|restore     ) shift; restore_it  "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
-		s|send|upload ) shift; upload_it   "${@}"; echo "${GREEN}Done${RESET} ${@}"; exit;;
+		d|delete      ) shift;   delete_it "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
+		  shrink      ) shift;   shrink_it "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
+		r|restore     ) shift;  restore_it "${@}"; echo "${GREEN}Done${RESET} ${1}"; exit;;
+		s|send|upload ) shift;   upload_it "${@}"; echo "${GREEN}Done${RESET} ${@}"; exit;;
 		g|get|download) shift; download_it "${@}"; echo "${GREEN}Done${RESET} ${@}"; exit;;
 
 		*) usage "Invalid option: ${1}";;
